@@ -1,0 +1,13 @@
+import 'package:flutter_security_package/encryption/aes_encryption.dart';
+
+// Encrypt data
+final encrypted = await AESEncryption.encrypt(
+  'sensitive_data',
+  key: 'your_secret_key',
+);
+
+// Decrypt data
+final decrypted = await AESEncryption.decrypt(
+  encrypted,
+  key: 'your_secret_key',
+);
