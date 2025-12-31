@@ -1,0 +1,28 @@
+import 'package:flutter_security_package/logging/secure_logger.dart';
+
+// Initialize secure logger
+final logger = SecureLogger(
+  appName: 'MyApp',
+  enableFileLogging: true,
+  enableRemoteLogging: true,
+  sentryDsn: 'your_sentry_dsn',
+);
+
+// Log securely (no sensitive data)
+logger.info('User logged in', {
+  'userId': 'user_123',
+  'timestamp': DateTime.now().toIso8601String(),
+});
+
+// Log errors securely
+try {
+  // Some operation
+} catch (error, stackTrace) {
+  logger.error(
+    'Operation failed',
+    error,
+    stackTrace,
+    // No sensitive data in context
+    context: {'operation': 'data_fetch'},
+  );
+}
