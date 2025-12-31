@@ -1,0 +1,14 @@
+import 'package:flutter_security_package/security_manager.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize security manager
+  await SecurityManager.initialize(
+    appId: 'your_app_id',
+    enableBiometrics: true,
+    enableCertificatePinning: true,
+  );
+  
+  runApp(MyApp());
+}
