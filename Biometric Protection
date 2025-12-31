@@ -1,0 +1,14 @@
+import 'package:flutter_security_package/storage/biometric_storage.dart';
+
+// Store data with biometric protection
+await BiometricStorage.store(
+  key: 'financial_data',
+  value: encryptedData,
+  biometricType: BiometricType.face,
+);
+
+// Retrieve with biometric authentication
+final data = await BiometricStorage.retrieve(
+  key: 'financial_data',
+  localizedReason: 'Authenticate to access financial data',
+);
