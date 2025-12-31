@@ -1,0 +1,13 @@
+import 'package:flutter_security_package/storage/secure_storage.dart';
+
+// Store sensitive data
+await SecureStorage.write('auth_token', 'your_jwt_token');
+
+// Read with biometric protection
+final token = await SecureStorage.read(
+  'auth_token',
+  requireBiometrics: true,
+);
+
+// Clear all secure data
+await SecureStorage.clearAll();
