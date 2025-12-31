@@ -1,0 +1,14 @@
+import 'package:flutter_security_package/validation/input_validator.dart';
+
+// Validate and sanitize input
+final sanitizedInput = InputValidator.sanitize(userInput);
+
+// Check for SQL injection
+if (InputValidator.hasSqlInjection(userInput)) {
+  throw SecurityException('Potential SQL injection detected');
+}
+
+// Check for XSS
+if (InputValidator.hasXss(userInput)) {
+  throw SecurityException('Potential XSS attack detected');
+}
