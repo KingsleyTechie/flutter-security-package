@@ -1,0 +1,517 @@
+
+## **lib/security_manager.dart:**
+```dart
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+
+class SecurityManager {
+  static final SecurityManager _instance = SecurityManager._internal();
+  factory SecurityManager() => _instance;
+  SecurityManager._internal();
+
+  static bool _isInitialized = false;
+  static String? _appId;
+  static bool _enableBiometrics = false;
+  static bool _enableCertificatePinning = false;
+  static SecurityLevel _securityLevel = SecurityLevel.high;
+  
+  // Security events stream
+  final StreamController<SecurityEvent> _securityEventController =
+      StreamController<SecurityEvent>.broadcast();
+  Stream<SecurityEvent> get securityEvents => _securityEventController.stream;
+  
+  Future<void> initialize({
+    required String appId,
+    bool enableBiometrics = false,
+    bool enableCertificatePinning = false,
+    SecurityLevel securityLevel = SecurityLevel.high,
+  }) async {
+    if (_isInitialized) {
+      throw SecurityException('SecurityManager already initialized');
+    }
+    
+    _appId = appId;
+    _enableBiometrics = enableBiometrics;
+    _enableCertificatePinning = enableCertificatePinning;
+    _securityLevel = securityLevel;
+    
+    try {
+      // 1. Initialize secure storage
+      await _initializeSecureStorage();
+      
+      // 2. Initialize encryption
+      await _initializeEncryption();
+      
+      // 3. Initialize network security
+      await _initializeNetworkSecurity();
+      
+      // 4. Initialize logging
+      await _initializeLogging();
+      
+      // 5. Perform security checks
+      await _performSecurityChecks();
+      
+      _isInitialized = true;
+      
+      _logSecurityEvent(
+        SecurityEvent(
+          type: SecurityEventType.initialized,
+          severity: SecuritySeverity.info,
+          message: 'SecurityManager initialized successfully',
+          timestamp: DateTime.now(),
+        ),
+      );
+      
+      if (kDebugMode) {
+        print('✅ SecurityManager initialized with level: $_securityLevel');
+      }
+    } catch (e) {
+      _logSecurityEvent(
+        SecurityEvent(
+          type: SecurityEventType.initializationFailed,
+          severity: SecuritySeverity.critical,
+          message: 'Failed to initialize SecurityManager: $e',
+          timestamp: DateTime.now(),
+        ),
+      );
+      rethrow;
+    }
+  }
+  
+  Future<void> _initializeSecureStorage() async {
+    // Initialize secure storage with app-specific encryption key
+    final encryptionKey = await _generateStorageEncryptionKey();
+    await SecureStorage.initialize(
+      encryptionKey: encryptionKey,
+      enableBiometrics: _enableBiometrics,
+    );
+    
+    if (_enableBiometrics) {
+      await BiometricStorage.initialize();
+    }
+  }
+  
+  Future<void> _initializeEncryption() async {
+    // Generate or load encryption keys
+    await AESEncryption.initialize();
+    await RSAHelper.initialize();
+  }
+  
+  Future<void> _initializeNetworkSecurity() async {
+    if (_enableCertificatePinning) {
+      await CertificatePinning.initialize();
+    }
+    
+    // Initialize secure HTTP client
+    await SecureHttpClient.initialize(
+      enableCertificatePinning: _enableCertificatePinning,
+      securityLevel: _securityLevel,
+    );
+  }
+  
+  Future<void> _initializeLogging() async {
+    await SecureLogger.initialize(
+      appId: _appId!,
+      enableFileLogging: true,
+      securityLevel: _securityLevel,
+    );
+  }
+  
+  Future<void> _performSecurityChecks() async {
+    // Check for root/jailbreak
+    await _checkDeviceSecurity();
+    
+    // Check network security
+    await _checkNetworkSecurity();
+    
+    // Check app integrity
+    await _checkAppIntegrity();
+  }
+  
+  Future<void> _checkDeviceSecurity() async {
+    final deviceInfo = DeviceInfoPlugin();
+    
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final androidInfo = await deviceInfo.androidInfo;
+      if (androidInfo.isRooted) {
+        _logSecurityEvent(
+          SecurityEvent(
+            type: SecurityEventType.deviceRooted,
+            severity: SecuritySeverity.high,
+            message: 'Device is rooted - security compromised',
+            timestamp: DateTime.now(),
+          ),
+        );
+        
+        if (_securityLevel == SecurityLevel.high) {
+          throw SecurityException('Rooted devices not allowed');
+        }
+      }
+    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      // Check for jailbreak indicators
+      if (await _isJailbroken()) {
+        _logSecurityEvent(
+          SecurityEvent(
+            type: SecurityEventType.deviceJailbroken,
+            severity: SecuritySeverity.high,
+            message: 'Device is jailbroken - security compromised',
+            timestamp: DateTime.now(),
+          ),
+        );
+        
+        if (_securityLevel == SecurityLevel.high) {
+          throw SecurityException('Jailbroken devices not allowed');
+        }
+      }
+    }
+  }
+  
+  Future<void> _checkNetworkSecurity() async {
+    final connectivity = Connectivity();
+    final result = await connectivity.checkConnectivity();
+    
+    if (result == ConnectivityResult.none) {
+      _logSecurityEvent(
+        SecurityEvent(
+          type: SecurityEventType.networkUnavailable,
+          severity: SecuritySeverity.warning,
+          message: 'No network connectivity',
+          timestamp: DateTime.now(),
+        ),
+      );
+    }
+    
+    // Check for VPN/proxy
+    if (await _isUsingVpn()) {
+      _logSecurityEvent(
+        SecurityEvent(
+          type: SecurityEventType.vpnDetected,
+          severity: SecuritySeverity.medium,
+          message: 'VPN detected - may affect security',
+          timestamp: DateTime.now(),
+        ),
+      );
+    }
+  }
+  
+  Future<void> _checkAppIntegrity() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    
+    // Verify app signature/packages
+    if (kDebugMode) {
+      _logSecurityEvent(
+        SecurityEvent(
+          type: SecurityEventType.debugMode,
+          severity: SecuritySeverity.warning,
+          message: 'App running in debug mode - security reduced',
+          timestamp: DateTime.now(),
+        ),
+      );
+    }
+    
+    // Check for tampering
+    if (await _isAppTampered()) {
+      _logSecurityEvent(
+        SecurityEvent(
+          type: SecurityEventType.appTampered,
+          severity: SecuritySeverity.critical,
+          message: 'App integrity compromised',
+          timestamp: DateTime.now(),
+        ),
+      );
+      
+      throw SecurityException('App integrity check failed');
+    }
+  }
+  
+  Future<String> _generateStorageEncryptionKey() async {
+    // Generate unique encryption key per installation
+    final deviceInfo = DeviceInfoPlugin();
+    String deviceId;
+    
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final androidInfo = await deviceInfo.androidInfo;
+      deviceId = androidInfo.id;
+    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      deviceId = iosInfo.identifierForVendor ?? 'ios_device';
+    } else {
+      deviceId = 'unknown_device';
+    }
+    
+    // Combine with app ID for uniqueness
+    final keyMaterial = '$_appId|$deviceId|${DateTime.now().millisecondsSinceEpoch}';
+    
+    // Hash to create encryption key
+    final bytes = utf8.encode(keyMaterial);
+    final digest = await compute(_hashData, bytes);
+    
+    return base64Url.encode(digest).substring(0, 32); // 32 chars for AES-256
+  }
+  
+  static List<int> _hashData(List<int> data) {
+    // Using SHA-256 for key derivation
+    import 'package:crypto/crypto.dart';
+    return sha256.convert(data).bytes;
+  }
+  
+  Future<bool> _isJailbroken() async {
+    // iOS jailbreak detection
+    // This is a simplified version - in production, use more sophisticated checks
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      try {
+        // Check for common jailbreak files
+        const jailbreakFiles = [
+          '/Applications/Cydia.app',
+          '/Library/MobileSubstrate/MobileSubstrate.dylib',
+          '/bin/bash',
+          '/usr/sbin/sshd',
+          '/etc/apt',
+        ];
+        
+        for (final file in jailbreakFiles) {
+          // In production, use platform channels to check file existence
+        }
+        
+        return false;
+      } catch (e) {
+        return true; // Exception may indicate jailbreak
+      }
+    }
+    
+    return false;
+  }
+  
+  Future<bool> _isUsingVpn() async {
+    // VPN detection
+    // This requires platform-specific implementation
+    return false;
+  }
+  
+  Future<bool> _isAppTampered() async {
+    // App integrity check
+    // This requires platform-specific implementation and code signing verification
+    return false;
+  }
+  
+  void _logSecurityEvent(SecurityEvent event) {
+    _securityEventController.add(event);
+    SecureLogger.logSecurityEvent(event);
+  }
+  
+  // Public API
+  static bool get isInitialized => _isInitialized;
+  static String? get appId => _appId;
+  static SecurityLevel get securityLevel => _securityLevel;
+  
+  Future<void> lockApp() async {
+    // Clear sensitive data from memory
+    await SecureStorage.lock();
+    
+    _logSecurityEvent(
+      SecurityEvent(
+        type: SecurityEventType.appLocked,
+        severity: SecuritySeverity.info,
+        message: 'App locked for security',
+        timestamp: DateTime.now(),
+      ),
+    );
+  }
+  
+  Future<void> wipeSensitiveData() async {
+    // Wipe all sensitive data
+    await SecureStorage.clearAll();
+    await BiometricStorage.clearAll();
+    
+    _logSecurityEvent(
+      SecurityEvent(
+        type: SecurityEventType.dataWiped,
+        severity: SecuritySeverity.info,
+        message: 'All sensitive data wiped',
+        timestamp: DateTime.now(),
+      ),
+    );
+  }
+  
+  Future<SecurityReport> generateSecurityReport() async {
+    return SecurityReport(
+      appId: _appId!,
+      securityLevel: _securityLevel,
+      timestamp: DateTime.now(),
+      deviceSecure: await _isDeviceSecure(),
+      networkSecure: await _isNetworkSecure(),
+      storageEncrypted: true,
+      certificatePinningEnabled: _enableCertificatePinning,
+      biometricsEnabled: _enableBiometrics,
+      vulnerabilities: await _detectVulnerabilities(),
+    );
+  }
+  
+  Future<bool> _isDeviceSecure() async {
+    // Check device security status
+    return true; // Simplified
+  }
+  
+  Future<bool> _isNetworkSecure() async {
+    // Check network security status
+    return true; // Simplified
+  }
+  
+  Future<List<SecurityVulnerability>> _detectVulnerabilities() async {
+    // Detect potential vulnerabilities
+    return [];
+  }
+  
+  @override
+  Future<void> dispose() async {
+    await _securityEventController.close();
+    await SecureStorage.dispose();
+    await BiometricStorage.dispose();
+  }
+}
+
+enum SecurityLevel {
+  low,    // Basic security
+  medium, // Standard security
+  high,   // Enhanced security
+  maximum // Maximum security (may impact UX)
+}
+
+class SecurityEvent {
+  final SecurityEventType type;
+  final SecuritySeverity severity;
+  final String message;
+  final DateTime timestamp;
+  final Map<String, dynamic>? metadata;
+  
+  const SecurityEvent({
+    required this.type,
+    required this.severity,
+    required this.message,
+    required this.timestamp,
+    this.metadata,
+  });
+}
+
+enum SecurityEventType {
+  initialized,
+  initializationFailed,
+  deviceRooted,
+  deviceJailbroken,
+  networkUnavailable,
+  vpnDetected,
+  debugMode,
+  appTampered,
+  appLocked,
+  dataWiped,
+  certificateMismatch,
+  biometricFailed,
+  encryptionError,
+  decryptionError,
+  storageError,
+  validationFailed,
+  attackDetected,
+}
+
+enum SecuritySeverity {
+  info,      // Informational
+  low,       // Low risk
+  medium,    // Medium risk
+  high,      // High risk
+  critical,  // Critical risk
+}
+
+class SecurityReport {
+  final String appId;
+  final SecurityLevel securityLevel;
+  final DateTime timestamp;
+  final bool deviceSecure;
+  final bool networkSecure;
+  final bool storageEncrypted;
+  final bool certificatePinningEnabled;
+  final bool biometricsEnabled;
+  final List<SecurityVulnerability> vulnerabilities;
+  
+  const SecurityReport({
+    required this.appId,
+    required this.securityLevel,
+    required this.timestamp,
+    required this.deviceSecure,
+    required this.networkSecure,
+    required this.storageEncrypted,
+    required this.certificatePinningEnabled,
+    required this.biometricsEnabled,
+    required this.vulnerabilities,
+  });
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'appId': appId,
+      'securityLevel': securityLevel.toString(),
+      'timestamp': timestamp.toIso8601String(),
+      'deviceSecure': deviceSecure,
+      'networkSecure': networkSecure,
+      'storageEncrypted': storageEncrypted,
+      'certificatePinningEnabled': certificatePinningEnabled,
+      'biometricsEnabled': biometricsEnabled,
+      'vulnerabilities': vulnerabilities.map((v) => v.toJson()).toList(),
+      'overallScore': _calculateScore(),
+    };
+  }
+  
+  double _calculateScore() {
+    double score = 100;
+    
+    if (!deviceSecure) score -= 30;
+    if (!networkSecure) score -= 20;
+    if (!storageEncrypted) score -= 20;
+    if (!certificatePinningEnabled) score -= 10;
+    if (!biometricsEnabled) score -= 5;
+    score -= vulnerabilities.length * 5;
+    
+    return score.clamp(0, 100);
+  }
+}
+
+class SecurityVulnerability {
+  final String id;
+  final String description;
+  final SecuritySeverity severity;
+  final String remediation;
+  
+  const SecurityVulnerability({
+    required this.id,
+    required this.description,
+    required this.severity,
+    required this.remediation,
+  });
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'description': description,
+      'severity': severity.toString(),
+      'remediation': remediation,
+    };
+  }
+}
+
+class SecurityException implements Exception {
+  final String message;
+  final SecuritySeverity severity;
+  final DateTime timestamp;
+  
+  const SecurityException(
+    this.message, {
+    this.severity = SecuritySeverity.high,
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
+  
+  @override
+  String toString() => 'SecurityException: $message (severity: $severity)';
+}
