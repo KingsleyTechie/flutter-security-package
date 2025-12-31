@@ -1,0 +1,21 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_security_package/security_testing.dart';
+
+void main() {
+  group('Security Tests', () {
+    test('Encryption should be reversible', () async {
+      final plaintext = 'sensitive_data';
+      final encrypted = await AESEncryption.encrypt(plaintext);
+      final decrypted = await AESEncryption.decrypt(encrypted);
+      expect(decrypted, plaintext);
+    });
+    
+    test('Storage should be encrypted', () async {
+      await SecurityTesting.verifyStorageEncryption();
+    });
+    
+    test('Network traffic should be encrypted', () async {
+      await SecurityTesting.verifyHttpsEnforcement();
+    });
+  });
+}
