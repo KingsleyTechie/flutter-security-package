@@ -1,0 +1,16 @@
+import 'package:flutter_security_package/network/certificate_pinning.dart';
+
+// Add trusted certificates
+CertificatePinning.addCertificate(
+  host: 'api.example.com',
+  sha256Fingerprint: 'ABCD1234...',
+);
+
+// Enable pinning for all requests
+CertificatePinning.enable(
+  failureCallback: (host, error) {
+    // Handle certificate mismatch
+    logger.warning('Certificate mismatch for $host: $error');
+    throw CertificatePinningException('Invalid certificate');
+  },
+);
