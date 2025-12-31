@@ -1,0 +1,14 @@
+import 'package:flutter_security_package/network/secure_client.dart';
+
+// Create secure HTTP client
+final client = SecureHttpClient(
+  baseUrl: 'https://api.example.com',
+  enableCertificatePinning: true,
+  enableRequestEncryption: true,
+);
+
+// Make secure request
+final response = await client.get(
+  '/secure-endpoint',
+  headers: {'Authorization': 'Bearer $token'},
+);
